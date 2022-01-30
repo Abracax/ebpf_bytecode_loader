@@ -1,6 +1,6 @@
 # An eBPF Loader without Libbpf and bcc
 
-This is a super lightweight eBPF loader that uses neither libbpf nor bcc, thus using no heavy object files.
+This is a super lightweight eBPF loader that separates filter-writing and filter-using. It uses neither libbpf nor bcc, thus using no heavy object files.
 
 The main feature of this loader is that it treats writing filters and inserting filters as independent processes, allowing them to be completed on different machines (e.g. local and server), which is not supported by libbpf or bcc.
 
