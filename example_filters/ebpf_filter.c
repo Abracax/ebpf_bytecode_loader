@@ -41,10 +41,6 @@ __section("icmp_filter") int classifier_icmp(struct __sk_buff *skb)
 	if (iph->version != 4 || iph->protocol != 1)
 		return TC_ACT_OK;
 
-	// if (htons(icmph->un.echo.id) != 0xbeef) {
-	// 	return TC_ACT_OK;
-	// }
-
 	// check for ICMP echo reply
 	switch(icmph->type) {
 		case 0: printk("ICMP Echo Reply Info: "); break;
