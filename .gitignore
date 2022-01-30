@@ -2,3 +2,5 @@
 *.o
 filter_gen
 ebpf_filter
+example_filters/ebpf_filter
+

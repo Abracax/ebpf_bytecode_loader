@@ -9,3 +9,5 @@ int main(int argc, char** argv)
 	generate_hex_dump(file_name, section_name);
 	return 0;
 }
+
+

@@ -1,22 +1,28 @@
-# eBPF Instruction Stream Extractor
+# An eBPF Loader without Libbpf and bcc
 
-## Prerequisite
+This is a super lightweight eBPF loader that uses neither libbpf nor bcc, thus using no heavy object files.
+
+The main feature of this loader is that it treats writing filters and inserting filters as independent processes, allowing them to be completed on different machines (e.g. local and server), which is not supported by libbpf or bcc.
+
+This loader extracts bytecode instruction streams from eBPF filters written in C that can be directly inserted into the kernel using the `bpf` syscall.
+
+The current example is an ICMP filter, logging information of ICMP packets to trace pipe. Use `sudo cat /sys/kernel/debug/tracing/trace_pipe` to see `printk` logging.
+
+
+## Installation Requirements
 
 - Linux Kernel Headers with BPF support
 - libelf
 
-
-
 ## Usage
 
-```shell
+```sh
 sh build.sh <ebpf source code path> <ebpf main section name>
 ```
 
-
 Example Output:
 
-```shell
+```sh
 sh build.sh example_filters/ebpf_filter.c section_name
 
 object file name: example_filters/ebpf_filter
@@ -50,15 +56,23 @@ number of instructions: 20
 
 ```
 
-## Why is this tool useful?
-
-We can directly load eBPF programs into the kernel without heavy object files!
-All parameters in the below code are supplied by this tool!
+Then use Syscall bpf to load output bytecode filter to kernel, copy the output instruction stream and filter length to `struct bpfinstr filter[]`.
 
 ```C
-char license[ELF_MAX_LICENSE_LEN] = "GPL";
-int filter_len = 20;
-struct bpfinstr filter[] = {
+
+struct bpfinstr
+{
+    uint16_t code;
+    uint8_t jt;
+    uint8_t jf;
+    uint32_t k;
+};
+
+int main()
+{
+    char license[ELF_MAX_LICENSE_LEN] = "GPL";
+    int filter_len = 20;
+    struct bpfinstr filter[] = {
 		{0xb7, 0x0, 0x0, 0x2},
 		{0x1261, 0x50, 0x0, 0x0},
 		{0x1161, 0x4c, 0x0, 0x0},
@@ -79,16 +93,25 @@ struct bpfinstr filter[] = {
 		{0x85, 0x0, 0x0, 0x6},
 		{0xb7, 0x0, 0x0, 0x0},
 		{0x95, 0x0, 0x0, 0x0},
-};
+    };
 
-union bpf_attr attr = {
-    .prog_type = 3,
-    .insns = (uintptr_t)filter,
-    .insn_cnt = filter_len,
-    .license = (uintptr_t)license
-};
+    union bpf_attr attr = {
+        .prog_type = 3,
+        .insns = (uintptr_t)filter,
+        .insn_cnt = filter_len,
+        .license = (uintptr_t)license
+    };
 
-int fd = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+    int fd = syscall(__NR_bpf, BPF_PROG_LOAD, &attr, sizeof(attr));
+    
+    if (fd > 0) {
+        printf("eBPF filter loaded, fd=%d", %d);
+        return 0;
+    }
+    
+	return fd;
+}
+
 ```
 
 ## Limitations

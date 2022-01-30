@@ -145,3 +145,4 @@ void generate_hex_dump(char *file_name, char *section_name)
 
 	bpf_fetch_load_prog(&__ctx, section_name);
 }
+
