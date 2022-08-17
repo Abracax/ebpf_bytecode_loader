@@ -1,4 +1,12 @@
 #include "filter_gen.h"
+#include  <errno.h>
+
+#define LOG_BUF_SZ 0x10000
+
+#define bpf(cmd,attr,size) syscall(SYS_bpf, (cmd), (attr), (size))
+
+static const char license[] = "GPL";
+
 
 static struct bpf_elf_sec_data data;
 static int bpf_elf_ctx_init(struct bpf_elf_ctx *ctx, const char *obj);
@@ -103,9 +111,43 @@ out_fd:
 	return ret;
 }
 
+int load_ebpf_filter (const void * filter, uint_fast32_t filterlen)
+{
+    union bpf_attr attr = {};
+    char logbuf[LOG_BUF_SZ] = {};
+    int ret;
+
+    printf("%s(filterlen:%u)",
+        __func__, (unsigned) filterlen);
+
+
+    attr.prog_type = BPF_PROG_TYPE_SOCKET_FILTER;
+    attr.insns = (uintptr_t) filter;
+    attr.insn_cnt = filterlen / 8;
+    attr.license = (uintptr_t) license;
+    attr.log_buf = (uintptr_t) logbuf;
+    attr.log_size = sizeof(logbuf);
+    attr.log_level = 1; // enable verifier log
+
+    ret = bpf(BPF_PROG_LOAD, &attr, sizeof(attr));
+    if (ret < 0) {
+        printf("bpf(BPF_PROG_LOAD) failed with %s", strerror(errno));
+
+        if (errno == EACCES)
+            printf("Filter rejected, reason: %s", logbuf);
+
+        ret = -2;
+    } else {
+        printf("Loaded prog fd: %d", ret);
+    }
+
+    return ret;
+}
+
+// TODO: Add basic load testing for the bpf prog
 static void bpf_fetch_load_prog(struct bpf_elf_ctx *ctx, const char *section)
 {
-	int i, ret = -1;
+	int i, rst, ret = -1;
 
 	for (i = 1; i < ctx->elf_hdr.e_shnum; i++)
 	{
@@ -119,14 +161,17 @@ static void bpf_fetch_load_prog(struct bpf_elf_ctx *ctx, const char *section)
 		int filter_len = data.sec_data->d_size / sizeof(struct bpfinstr);
 
 		struct bpfinstr *filter_out = data.sec_data->d_buf;
-		printf("\ninstruction stream:\n{\n");
+
 		for (i = 0; i < filter_len; i++)
 		{
 			printf("    {0x%x, 0x%x, 0x%x, 0x%x}, \n", filter_out[i].code, filter_out[i].jt, filter_out[i].jf, filter_out[i].k);
 		}
-		printf("};\n\n");
 
-		printf("number of instructions: %d\n", filter_len);
+		rst = load_ebpf_filter((const void *)filter_out, data.sec_data->d_size);
+
+		if (rst >= 0)
+            close(rst);
+
 		break;
 	}
 }
